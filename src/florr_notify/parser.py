@@ -22,7 +22,19 @@ Recognized description patterns (ZWSP stripped first):
   2. Standard kill   : "(A|An) (Super|Unique|Eternal) <BaseMob> has been defeated by <players>!"
                        -> KillEvent, mob from filename (with variant),
                           rarity + killers from description
-  3. Craft broadcast : "...has been crafted/forged by <player>!"  -> None
+  3. Craft broadcast : "...has been crafted/forged by <player>!"  -> None  (any
+     "has been <verb> by <player>" that is not a kill: petals share names and
+     image filenames with mobs, e.g. petal Cactus vs mob Cactus)
+  4. Flavor spawn   : prose description (Rock, Cactus, ..., Hel, plus any rarity)
+                       -> SpawnEvent, mob + rarity from filename
+  5. Anything else  : -> None
+
+  NOTE on ZWSP: descriptions open with interleaved zero-width chars
+  (ZWSP NL ZWSP NL for some broadcast kinds). _clean removes them
+  GLOBALLY: edge-stripping alone left a leading ZWSP that broke the
+  ^-anchored regexes, and spawns of mobs missing from MOBS (Ant Egg,
+  Termite Mound, Termite Overmind) then fell to None -- silently,
+  while their kill edits still parsed (kills use a cleanable format).
      (any "has been <verb> by <player>" that is not a kill: petals share
       names and image filenames with mobs, e.g. petal Cactus vs mob Cactus)
   4. Flavor spawn   : prose description (Rock, Cactus, ..., Hel, plus any rarity)
@@ -38,8 +50,11 @@ from urllib.parse import urlparse
 
 from .mobs import MOBS, parse_filename
 
-# Zero-width chars Discord may prepend/append to embed descriptions.
-_INVISIBLE = "\u200b\u200c\u200d\u2060\ufeff"
+# Zero-width chars Discord may prepend/append to embed descriptions -- and,
+# for some broadcast kinds, INTERLEAVE (spawn embeds open with ZWSP NL ZWSP
+# NL, which edge-stripping cannot fully remove). Remove them everywhere:
+# they never carry meaning in broadcast text.
+_INVIS_CHARS = re.compile("[\u200b\u200c\u200d\u2060\ufeff]+")
 
 _SPAWN_RE = re.compile(
     r"^(?:A|An) (Super|Unique|Eternal) (.+?) has spawned!$"
@@ -59,8 +74,9 @@ _CRAFTISH_RE = re.compile(r"has been\s+\S+\s+by\b", re.IGNORECASE)
 _PLAYER_SPLIT_RE = re.compile(r",\s+|\s+and\s+")
 
 
+
 def _clean(s: str) -> str:
-    return s.strip(_INVISIBLE).strip()
+    return _INVIS_CHARS.sub("", s).strip()
 
 
 def parse_players(text: str) -> list[str]:

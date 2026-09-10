@@ -275,7 +275,13 @@ def test_resolve_mob_from_filename():
     assert resolve_mob_from_filename("petal-ghost-unique.png") == "Ghost"
     assert resolve_mob_from_filename("petal-mecha_flower-eternal-x.png") == "Mecha Flower"
     assert resolve_mob_from_filename("petal-centipede_body-super.png") is None
-    assert resolve_mob_from_filename("petal-bee-super.png") is None
+    assert resolve_mob_from_filename("petal-leech_body-super.png") is None
+    assert resolve_mob_from_filename("petal-worm_guts-super.png") is None
+    assert resolve_mob_from_filename("petal-bee-super.png") == "Bee"
+    assert resolve_mob_from_filename("petal-ant_egg-super.png") == "Ant Egg"
+    assert resolve_mob_from_filename("petal-termite_mound-super.png") == "Termite Mound"
+    assert resolve_mob_from_filename("petal-termite_overmind-super.png") == "Termite Overmind"
+    assert resolve_mob_from_filename("petal-garbage-super.png") == "Garbage"
     assert resolve_mob_from_filename("") is None
     assert resolve_mob_from_filename("not-a-filename") is None
 

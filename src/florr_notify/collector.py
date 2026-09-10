@@ -199,6 +199,19 @@ class Collector(discord.Client):
                 log.exception("parse failed for msg %s", message.id)
                 continue
             if e is None:
+                # Craft broadcasts return None inside parse_embed via their
+                # own check, so anything reaching this log is a game-channel
+                # message we genuinely do not understand. This matters:
+                # Ant Egg / Termite Mound / Termite Overmind spawns were
+                # never observed in a parseable state (spawn_at stayed NULL
+                # while their kill edits arrived) -- this line reveals what
+                # the original message actually looked like.
+                thumb_url = emb.thumbnail.url if emb.thumbnail else ""
+                log.info(
+                    "unparsed embed  msg=%s  desc=%.140r  img=%s",
+                    message.id, emb.description or "",
+                    thumb_url.rsplit("/", 1)[-1] or "-",
+                )
                 continue
             if isinstance(e, SpawnEvent):
                 self.store.upsert_spawn(e)
