@@ -1,0 +1,37 @@
+# secrets & local config
+config.toml
+*.token
+.env
+.env.*
+
+# data
+data/
+*.db
+*.db-journal
+*.db-wal
+
+# local research notes (design-decision archive, not for the repo)
+research/
+*.db-shm
+
+# logs
+*.log
+logs/
+
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# editor
+.vscode/
+.idea/
+*.swp

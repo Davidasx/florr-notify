@@ -1,0 +1,57 @@
+# florr-notify configuration
+# 1. Copy:    cp config.example.toml config.toml
+# 2. Fill in `token` (see research/01 §4.2 for extraction)
+# 3. Lock:    chmod 600 config.toml
+#
+# This file MUST NOT be committed to git. .gitignore covers it.
+
+[discord]
+# User account token (NEVER share; full account control).
+# Recommended: a dedicated alt account joined to the florr.io server.
+token = "PASTE_YOUR_TOKEN_HERE"
+
+# #game channel in florr.io Discord
+game_channel_id = 1349166028126556160
+
+# Optional: guild restriction (florr.io server ID)
+guild_id = 668937237010055189
+
+# Backfill on startup: number of recent messages to scan.
+# Backfill window is hardcoded to 24 hours (no message-count limit):
+# mobs spawned within 24h with no kill broadcast are recorded as alive.
+
+[storage]
+db_path = "./data/florr-notify.db"
+
+[notify]
+# Desktop notification via notify-send
+desktop = true
+
+# true -> suppress ALL desktop notifications (events are still stored
+# and logged; useful for pure data collection)
+silent = false
+
+# Announcement whitelists. Semantics:
+#   - omit a key            -> no filtering for that kind (everything reported)
+#   - present (even empty)  -> ONLY the listed mobs are reported
+#                              (exact display name, case-insensitive;
+#                              an empty list silences that kind entirely)
+#
+#   Asymmetric by rarity-visibility:
+#   - spawn matching is on the BASE mob, and cosmetic-variant entries
+#     (e.g. "Mecha Wasp") are IGNORED for spawns -- the variant is not
+#     visible until the kill. List the base mob to catch all its spawns.
+#     (Hel mobs and standalones are precise and match by their own name.)
+#   - kill matching is exact: "Mecha Wasp" matches only Mecha Wasp kills.
+#
+# Filtering affects notifications only -- everything is always stored.
+# The whitelist applies to Super-rarity announcements only; Unique and
+# Eternal are always announced regardless of the whitelist.
+#
+# Examples:
+#   [whitelist]
+#   spawn = ["Wasp", "Hel Spider"]   # all wasp spawns + Hel Spider spawns
+#   kill = ["Mecha Wasp"]            # only Mecha Wasp kill notifications
+
+[logging]
+level = "INFO"
