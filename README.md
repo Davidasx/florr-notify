@@ -33,9 +33,22 @@ pip install -e ".[dev]"
 
 ## Configuration
 
-1. Extract your token (see how the parser authenticates: DevTools → Network →
-   the `Authorization` header of any Discord request). **Using a burner
-   account is strongly recommended.**
+1. Open discord.com in a browser and press `F12` (DevTools → Console). In the
+   desktop app you must enable DevTools first; the browser needs no setup.
+   Paste and run:
+
+   ```js
+   (w = webpackChunkdiscord_app).push([[Symbol()], {}, o => {
+     try {
+       Object.values(o.c).some(e => e.exports?.setToken && (w.t = e.exports.getToken()))
+     } catch {}
+   }]), w.t
+   ```
+
+   The console echoes your token as a quoted string. Copy it **without the
+   quotes**. The token grants full access to your account -- never paste it
+   into any website, chat, or online decoder.
+   **Using a burner account is strongly recommended.**
 2. Copy the example config:
    ```bash
    cp config.example.toml config.toml

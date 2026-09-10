@@ -179,6 +179,23 @@ def test_parse_craft_ignored():
     assert parse_embed(CRAFT_EMBED, **_msg_args(message_id=400)) is None
 
 
+ETERNAL_CRAFT_EMBED = {
+    "type": "rich",
+    "description": "An Eternal Cactus has been crafted by Gonee_!",
+    "color": ETERNAL_LIGHT,
+    "thumbnail": {"url": "https://cdn.discordapp.com/attachments/x/petal-cactus-eternal.png"},
+    "footer": {"text": "Sierra (ASIA)"},
+}
+
+
+def test_parse_eternal_craft_ignored():
+    """Eternal petals use the 'An Eternal ...' article and the 'crafted'
+    verb. This must stay None despite all three collision factors at once:
+    An-article, eternal rarity, and the petal/mob Cactus name+image clash
+    (would otherwise bypass the whitelist as an Eternal mob spawn)."""
+    assert parse_embed(ETERNAL_CRAFT_EMBED, **_msg_args(message_id=402)) is None
+
+
 FORGED_PETAL_EMBED = {
     "type": "rich",
     "description": (
