@@ -1,4 +1,5 @@
-from __future__ import annotations
+"""CLI entry point: florr-notify run | status | alive [query] | cooldown |
+predict <mob> [server]."""
 import argparse
 import logging
 import sys
@@ -9,7 +10,7 @@ from .config import load_config
 from .collector import Collector
 from .notify import Notifier
 from .store import Store
-from .mobs import base_mob
+from .mobs import base_mob, resolve_region
 
 
 def _setup_logging(level: str) -> None:
@@ -97,19 +98,51 @@ def _print_by_region(
             print(f"    {mob:<22} {detail}")
 
 
-def cmd_alive(cfg) -> None:
+def _filter_alive_rows(rows, query: str | None, cfg) -> tuple[list, str]:
+    """Apply the `alive [query]` filter. Returns (filtered_rows, note).
+
+    - 'whitelist' (reserved): only mobs that would pass the spawn
+      whitelist. Mirrors notification semantics: the whitelist gates Super
+      spawns only, so Unique/Eternal rows always show; with no spawn
+      whitelist configured everything shows.
+    - Server shorthand (asia / eu / us, case-insensitive) filters by region.
+    - Anything else is an EXACT base-mob match, case-insensitive. Variant
+      names ("shiny leafbug") deliberately match nothing: the user is
+      expected to query the base mob and read the prediction line, which
+      shows the lock-in (e.g. Shiny Leafbug 100%) when the cooldown forces
+      it."""
+    if not query:
+        return list(rows), ""
+    if query.strip().lower() == "whitelist":
+        def _kept(r) -> bool:
+            if r["rarity"] != "super":
+                return True          # Unique/Eternal are whitelist-exempt
+            return cfg.whitelist.allows_spawn(r["mob"])
+        kept = [r for r in rows if _kept(r)]
+        if cfg.whitelist.spawn is None:
+            return kept, "whitelist (none configured -> all shown)"
+        return kept, "whitelist"
+    region = resolve_region(query)
+    if region is not None:
+        return [r for r in rows if r["region"] == region], f"region {region}"
+    q = query.strip().lower()
+    return [r for r in rows if r["mob"].strip().lower() == q], f"mob '{q}'"
+
+
+def cmd_alive(cfg, query: str | None = None) -> None:
     """Mobs spawned within the last 24h with no kill broadcast (believed
     alive), grouped by server, newest spawn first. For multi-variant mobs
     a variant prediction (distribution + confidence) is shown: the
     cooldown exclusion is evaluated at the mob's own spawn time, since
-    its variant was fixed the moment it spawned."""
+    its variant was fixed the moment it spawned. Optional query: a server
+    shorthand (asia/eu/us) or an exact base mob name (case-insensitive)."""
     from .mobs import base_mob as _base_mob
     from .predictor import predict, format_prediction_line
     now = datetime.now(timezone.utc)
     store = Store(cfg.storage.db_path)
     entries: list[tuple[str, str, str, str | None]] = []
     try:
-        rows = store.alive()
+        rows, note = _filter_alive_rows(store.alive(), query, cfg)
         for r in rows:
             spawn_dt = datetime.fromisoformat(r["spawn_at"])
             pred_line = None
@@ -130,10 +163,12 @@ def cmd_alive(cfg) -> None:
     for region, mob, age, pred_line in entries:
         groups.setdefault(region, []).append((mob, age, pred_line))
     if not groups:
-        print("alive mobs (spawned, no kill broadcast): none")
+        print("alive mobs (spawned, no kill broadcast): none"
+              + (f"  [filter: {note}]" if note else ""))
         return
     total = sum(len(v) for v in groups.values())
-    print(f"alive mobs (spawned, no kill broadcast): {total}")
+    print(f"alive mobs (spawned, no kill broadcast): {total}"
+          + (f"  [filter: {note}]" if note else ""))
     for region in sorted(groups):
         print(f"  {region}:")
         for mob, age, pred_line in groups[region]:
@@ -199,7 +234,14 @@ def main(argv: list[str] | None = None) -> int:
     p_alive = sub.add_parser(
         "alive", help="Mobs believed alive, grouped by server"
     )
-    p_alive.set_defaults(_fn=cmd_alive)
+    p_alive.add_argument(
+        "query", nargs="?", default=None,
+        help="Optional filter: server shorthand 'asia'/'eu'/'us', or an "
+             "exact base mob name (case-insensitive), or the reserved word "
+             "'whitelist'. Variant names match nothing -- query the base and "
+             "read the prediction line, which shows a cooldown lock-in "
+             "(e.g. Shiny Leafbug 100%)",
+    )
 
     p_cooldown = sub.add_parser(
         "cooldown", help="Mobs in the 30-min respawn cooldown, by server"
@@ -209,7 +251,6 @@ def main(argv: list[str] | None = None) -> int:
 
     args = ap.parse_args(argv)
     cfg = load_config(Path(args.config))
-
     if args.cmd is None:
         # No subcommand -> default to run
         cmd_run(cfg)
@@ -217,6 +258,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "predict":
         cmd_predict(cfg, args.mob, args.server)
+    elif args.cmd == "alive":
+        cmd_alive(cfg, args.query)
     else:
         args._fn(cfg)
     return 0
