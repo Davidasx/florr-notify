@@ -173,7 +173,8 @@ class Collector(discord.Client):
         # rebuild a Message view from the gateway payload and run the same
         # pipeline. Upserts are idempotent, so double-handling is harmless.
         data = event.data
-        if data.get("channel_id") != self.cfg.discord.game_channel_id:
+        # gateway snowflakes are STRINGS; cfg id is an int -- compare as ints
+        if int(data.get("channel_id", 0)) != self.cfg.discord.game_channel_id:
             return
         channel = self.get_channel(int(data["channel_id"]))
         if channel is None:   # guild/channel not in cache yet
