@@ -90,6 +90,10 @@ journalctl --user -u florr-notify -f
 - **Read-only**: never sends messages, never joins/leaves servers, calls no
   REST write endpoints.
 - Gateway disconnects are resumed/reconnected automatically by dpy-self.
+- Kill broadcasts are EDITS of the spawn message. They are handled via the
+  raw edit event so they work even for messages outside the client's
+  in-memory cache (dpy-self only dispatches the cached `message_edit` for
+  known messages, and the cache is empty after every restart).
 - On startup it backfills the **last 24 hours**, which:
   - sees kills that happened while offline (`edited_timestamp` is the real
     kill time);

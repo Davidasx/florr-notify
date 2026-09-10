@@ -164,10 +164,22 @@ class Collector(discord.Client):
             return
         await self._handle(message)
 
-    async def on_message_edit(self, before, after: Message) -> None:
-        if after.channel.id != self.cfg.discord.game_channel_id:
+    async def on_raw_message_edit(self, event: discord.RawMessageUpdateEvent) -> None:
+        # discord.py-self dispatches on_message_edit ONLY for messages in its
+        # in-memory cache (state.parse_message_update falls back to just the
+        # raw event when the cache lookup misses). The cache is empty after
+        # every restart, so kill edits of mobs spawned before the restart
+        # would be silently missed. The raw event fires for EVERY edit:
+        # rebuild a Message view from the gateway payload and run the same
+        # pipeline. Upserts are idempotent, so double-handling is harmless.
+        data = event.data
+        if data.get("channel_id") != self.cfg.discord.game_channel_id:
             return
-        await self._handle(after)
+        channel = self.get_channel(int(data["channel_id"]))
+        if channel is None:   # guild/channel not in cache yet
+            return
+        msg = discord.Message(channel=channel, data=data, state=self._connection)
+        await self._handle(msg)
 
     # ---- core ----
     async def _handle(self, message: Message, *, notify: bool = True) -> None:

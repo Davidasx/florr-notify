@@ -233,12 +233,17 @@ def test_format_prediction_line_sorted_descending():
     assert "cooldown" not in line  # no cooldown here
 
 
-def test_format_prediction_line_includes_cooldown():
+def test_format_prediction_line_shows_cooldown_lockin():
     pred = Prediction(
         base_mob="Spider", sample_size=3,
         distribution={"Spider": 1.0}, top_variant="Spider",
         top_pct=1.0, confidence_pct=100, candidate_count=1,
         excluded=("Mecha Spider",), cooldown_minutes={"Mecha Spider": 18.0},
     )
-    # k=1 -> None (trivial, no prediction line)
-    assert format_prediction_line(pred) is None
+    # Lock-in via cooldown: the prediction MUST still be shown -- the only
+    # candidate is informative (this regression: the rare Shiny Leafbug was
+    # missed because a full lock-in suppressed the whole line).
+    line = format_prediction_line(pred)
+    assert line is not None
+    assert "Spider 100%" in line
+    assert "Mecha Spider 18m" in line

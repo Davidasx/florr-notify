@@ -282,11 +282,16 @@ def predict(
 
 def format_prediction_line(pred: Prediction) -> str | None:
     """Return a short human-readable prediction line for notifications, or
-    None if there's nothing useful to show (e.g. no candidate, or only one
-    candidate)."""
+    None if there's nothing useful to show.
+
+    A true standalone mob (single possible candidate, nothing excluded --
+    e.g. Worker Ant, Hel Spider) is skipped: predicting "it is itself"
+    carries no information. A cooldown lock-in (all other variants
+    excluded, exactly one remains) is the MOST informative case and must
+    still be shown."""
     if not pred.distribution or pred.top_variant is None:
         return None
-    if pred.candidate_count <= 1:
+    if pred.candidate_count <= 1 and not pred.excluded:
         return None
     parts = [f"{v} {p*100:.0f}%" for v, p in
              sorted(pred.distribution.items(), key=lambda kv: (-kv[1], kv[0]))]
