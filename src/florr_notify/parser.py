@@ -22,7 +22,9 @@ Recognized description patterns (ZWSP stripped first):
   2. Standard kill   : "(A|An) (Super|Unique|Eternal) <BaseMob> has been defeated by <players>!"
                        -> KillEvent, mob from filename (with variant),
                           rarity + killers from description
-  3. Crafted item   : "...has been crafted by <player>!"  -> None
+  3. Craft broadcast : "...has been crafted/forged by <player>!"  -> None
+     (any "has been <verb> by <player>" that is not a kill: petals share
+      names and image filenames with mobs, e.g. petal Cactus vs mob Cactus)
   4. Flavor spawn   : prose description (Rock, Cactus, ..., Hel, plus any rarity)
                        -> SpawnEvent, mob + rarity from filename
   5. Anything else  : -> None
@@ -45,7 +47,15 @@ _SPAWN_RE = re.compile(
 _KILL_RE = re.compile(
     r"^(?:A|An) (Super|Unique|Eternal) (.+?) has been defeated by (.+)!$"
 )
-_CRAFT_RE = re.compile(r"has been\s+crafted\s+by", re.IGNORECASE)
+# Craft broadcasts: "has been crafted/forged by <player>". Verbs observed in
+# the wild: crafted, forged. IMPORTANT: petal broadcasts share names AND
+# thumbnail filenames with mobs (the petal Cactus vs the mob Cactus), so a
+# craft that slips past this check would fall through to the flavor-spawn
+# fallback and be recorded as a fake mob spawn (whitelist-exempt for
+# Unique/Eternal!). Defensive net: ANY "has been <verb> by <player>" that
+# failed the kill pattern above is craft-like and must be ignored -- mob
+# spawns never use that structure ("has spawned!" or plain flavor text).
+_CRAFTISH_RE = re.compile(r"has been\s+\S+\s+by\b", re.IGNORECASE)
 _PLAYER_SPLIT_RE = re.compile(r",\s+|\s+and\s+")
 
 
@@ -149,8 +159,10 @@ def parse_embed(
             mob=mob, rarity=rarity, killers=killers, **shared,
         )
 
-    # 3. Crafted item -> ignore
-    if _CRAFT_RE.search(desc):
+    # 3. Crafted / forged petal -> ignore (e.g. "The Unique Cactus has been
+    #    forged by Chzhou66!" -- the petal Cactus shares the mob's name and
+    #    image naming). See _CRAFTISH_RE for why this must be a wide net.
+    if _CRAFTISH_RE.search(desc):
         return None
 
     # 4. Flavor-text spawn (no standard description pattern) -> mob + rarity

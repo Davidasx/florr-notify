@@ -179,6 +179,26 @@ def test_parse_craft_ignored():
     assert parse_embed(CRAFT_EMBED, **_msg_args(message_id=400)) is None
 
 
+FORGED_PETAL_EMBED = {
+    "type": "rich",
+    "description": (
+        "\u200b\n\u200bThe Unique Cactus has been forged by Chzhou66!"
+    ),
+    "color": 0,
+    "thumbnail": {"url": "https://cdn.discordapp.com/attachments/x/petal-cactus-unique.png"},
+    "footer": {"text": ""},
+}
+
+
+def test_parse_forged_petal_ignored_even_when_name_collides_with_mob():
+    """Regression: the petal Cactus shares name AND image naming with the
+    mob Cactus. 'forged by' (not 'crafted by') slipped past the craft check
+    and the flavor-spawn fallback recorded a fake Unique Cactus spawn
+    (whitelist-exempt -> desktop notification). Any 'has been <verb> by'
+    that is not a kill must be ignored."""
+    assert parse_embed(FORGED_PETAL_EMBED, **_msg_args(message_id=401)) is None
+
+
 # --- Edge cases ---
 
 def test_zwsp_stripped():
