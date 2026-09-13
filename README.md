@@ -64,7 +64,7 @@ Development mode:
 florr-notify run         # foreground
 florr-notify status      # DB summary (last 10 rows)
 florr-notify alive [query]  # mobs believed alive, with predictions; query is
-                            # 'asia'/'eu'/'us', an exact base mob name, or
+                            # 'as'/'eu'/'us', an exact base mob name, or
                             # 'whitelist' (spawn-whitelisted mobs only)
 florr-notify cooldown    # per-server 30-min respawn cooldowns
 florr-notify predict <mob> [server]   # variant prediction for the next spawn

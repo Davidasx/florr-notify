@@ -184,8 +184,17 @@ class Collector(discord.Client):
 
     # ---- core ----
     async def _handle(self, message: Message, *, notify: bool = True) -> None:
+        # Discord occasionally re-delivers MESSAGE_UPDATE for months-old
+        # messages (embed cache refreshes etc.). Their edited_at is ancient,
+        # outside the retention window -- pure noise. Skip stale events.
+        event_time = message.edited_at or message.created_at
+        if datetime.now(timezone.utc) - event_time > timedelta(hours=BACKFILL_HOURS):
+            log.debug(
+                "skipping stale event msg=%s (observed_at=%s)", message.id, event_time,
+            )
+            return
         self._track_message_id(message)
-        ts = (message.edited_at or message.created_at).isoformat()
+        ts = event_time.isoformat()
         for emb in message.embeds:
             try:
                 e = parse_embed(

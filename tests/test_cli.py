@@ -33,7 +33,7 @@ def test_no_query_returns_all():
 
 
 def test_server_shorthand_filters_by_region():
-    for q, want_region in [("asia", "Sierra (ASIA)"), ("EU", "Romeo (EU)"),
+    for q, want_region in [("as", "Sierra (ASIA)"), ("EU", "Romeo (EU)"),
                            ("us", "Juliett (US)")]:
         rows, note = _filter_alive_rows(ROWS, q, None)
         assert all(r["region"] == want_region for r in rows)
@@ -63,7 +63,7 @@ def test_unknown_query_matches_nothing():
 
 
 def test_empty_rowset_still_classifies_query():
-    rows, note = _filter_alive_rows([], "asia", None)
+    rows, note = _filter_alive_rows([], "as", None)
     assert rows == [] and note.startswith("region ")
     rows, note = _filter_alive_rows([], "leafbug", None)
     assert rows == [] and note.startswith("mob ")

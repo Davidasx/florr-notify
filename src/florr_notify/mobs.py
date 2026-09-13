@@ -214,7 +214,8 @@ def base_mob(display_name: str) -> str:
 # Regions (servers) and shorthand resolution
 # ---------------------------------------------------------------------------
 _REGION_ALIASES: dict[str, str] = {
-    "asia": "Sierra (ASIA)",
+    # Player-community shorthands ("as", NOT "asia").
+    "as":   "Sierra (ASIA)",
     "eu":   "Romeo (EU)",
     "us":   "Juliett (US)",
 }
@@ -222,7 +223,7 @@ _REGION_ALIASES: dict[str, str] = {
 
 def resolve_region(arg: str) -> str | None:
     """Resolve a CLI region argument. ONLY the three shorthands are
-    accepted: 'asia' / 'eu' / 'us' (case-insensitive). Nothing else.
+    accepted: 'as' / 'eu' / 'us' (case-insensitive). Nothing else.
 
     "EU"   -> "Romeo (EU)"
     "eu"   -> "Romeo (EU)"

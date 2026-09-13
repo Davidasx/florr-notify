@@ -64,7 +64,7 @@ def cmd_predict(cfg, mob_name: str, server_arg: str | None = None) -> None:
         server = resolve_region(server_arg)
         if server is None:
             print(
-                f"Unknown region {server_arg!r}; only 'asia' / 'eu' / 'us' "
+                f"Unknown region {server_arg!r}; only 'as' / 'eu' / 'us' "
                 f"are accepted."
             )
             return
@@ -105,7 +105,7 @@ def _filter_alive_rows(rows, query: str | None, cfg) -> tuple[list, str]:
       whitelist. Mirrors notification semantics: the whitelist gates Super
       spawns only, so Unique/Eternal rows always show; with no spawn
       whitelist configured everything shows.
-    - Server shorthand (asia / eu / us, case-insensitive) filters by region.
+    - Server shorthand (as / eu / us, case-insensitive) filters by region.
     - Anything else is an EXACT base-mob match, case-insensitive. Variant
       names ("shiny leafbug") deliberately match nothing: the user is
       expected to query the base mob and read the prediction line, which
@@ -135,7 +135,7 @@ def cmd_alive(cfg, query: str | None = None) -> None:
     a variant prediction (distribution + confidence) is shown: the
     cooldown exclusion is evaluated at the mob's own spawn time, since
     its variant was fixed the moment it spawned. Optional query: a server
-    shorthand (asia/eu/us) or an exact base mob name (case-insensitive)."""
+    shorthand (as/eu/us) or an exact base mob name (case-insensitive)."""
     from .mobs import base_mob as _base_mob
     from .predictor import predict, format_prediction_line
     now = datetime.now(timezone.utc)
@@ -227,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_predict.add_argument(
         "server", nargs="?", default=None,
-        help="Server shorthand: only 'asia' / 'eu' / 'us'; enables the "
+        help="Server shorthand: only 'as' / 'eu' / 'us'; enables the "
              "30-min cooldown exclusion (e.g. predict leafbug eu)",
     )
 
@@ -236,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_alive.add_argument(
         "query", nargs="?", default=None,
-        help="Optional filter: server shorthand 'asia'/'eu'/'us', or an "
+        help="Optional filter: server shorthand 'as'/'eu'/'us', or an "
              "exact base mob name (case-insensitive), or the reserved word "
              "'whitelist'. Variant names match nothing -- query the base and "
              "read the prediction line, which shows a cooldown lock-in "
