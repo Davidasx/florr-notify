@@ -33,7 +33,7 @@ from discord import Message
 
 from .config import Config
 from .mobs import BASE_OF, base_mob as _base_mob
-from .parser import KillEvent, SpawnEvent, parse_embed
+from .parser import KillEvent, SpawnEvent, is_craft_broadcast, parse_embed
 from .predictor import predict, format_prediction_line
 from .store import Store, BACKFILL_HOURS
 from .notify import Notifier
@@ -208,18 +208,23 @@ class Collector(discord.Client):
                 log.exception("parse failed for msg %s", message.id)
                 continue
             if e is None:
-                # Craft broadcasts return None inside parse_embed via their
-                # own check, so anything reaching this log is a game-channel
-                # message we genuinely do not understand. This matters:
+                thumb_url = emb.thumbnail.url if emb.thumbnail else ""
+                img = thumb_url.rsplit("/", 1)[-1] or "-"
+                if is_craft_broadcast(emb.description or ""):
+                    # Deliberately ignored (petal craft): expected, not an
+                    # Deliberately ignored (petal craft): expected behavior,
+                    # logged as "craft" so it is easy to filter out.
+                    log.info("craft broadcast ignored  msg=%s  img=%s",
+                              message.id, img)
+                    continue
+                # Genuinely unknown game-channel message. This matters:
                 # Ant Egg / Termite Mound / Termite Overmind spawns were
                 # never observed in a parseable state (spawn_at stayed NULL
                 # while their kill edits arrived) -- this line reveals what
                 # the original message actually looked like.
-                thumb_url = emb.thumbnail.url if emb.thumbnail else ""
                 log.info(
                     "unparsed embed  msg=%s  desc=%.140r  img=%s",
-                    message.id, emb.description or "",
-                    thumb_url.rsplit("/", 1)[-1] or "-",
+                    message.id, emb.description or "", img,
                 )
                 continue
             if isinstance(e, SpawnEvent):

@@ -74,6 +74,13 @@ _CRAFTISH_RE = re.compile(r"has been\s+\S+\s+by\b", re.IGNORECASE)
 _PLAYER_SPLIT_RE = re.compile(r",\s+|\s+and\s+")
 
 
+def is_craft_broadcast(desc: str) -> bool:
+    """True if the description is a petal craft broadcast ("has been
+    crafted/forged by <player>"). Exposed so the collector can tell a
+    deliberately-ignored craft apart from an unknown message when
+    logging parse skips."""
+    return bool(_CRAFTISH_RE.search(_clean(desc)))
+
 
 def _clean(s: str) -> str:
     return _INVIS_CHARS.sub("", s).strip()
@@ -178,7 +185,7 @@ def parse_embed(
     # 3. Crafted / forged petal -> ignore (e.g. "The Unique Cactus has been
     #    forged by Chzhou66!" -- the petal Cactus shares the mob's name and
     #    image naming). See _CRAFTISH_RE for why this must be a wide net.
-    if _CRAFTISH_RE.search(desc):
+    if is_craft_broadcast(desc):
         return None
 
     # 4. Flavor-text spawn (no standard description pattern) -> mob + rarity
