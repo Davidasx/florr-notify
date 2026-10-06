@@ -22,10 +22,11 @@ Discord #game ──(gateway WebSocket)──▶ discord.py-self Collector
 ## Install
 
 Requires Python ≥ 3.10 (3.12 recommended; `curl_cffi` ships prebuilt wheels
-for 3.12/3.13).
+for 3.12/3.13). Create the venv with an explicit interpreter -- on systems
+where `python3` has moved on (e.g. 3.14) the default may lack wheels:
 
 ```bash
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -U pip
 pip install -e ".[dev]"
