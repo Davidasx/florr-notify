@@ -126,6 +126,29 @@ def test_parse_wasp_spawn():
     assert e.image_url.startswith("https://cdn.discordapp.com/")
 
 
+SUMMON_EMBED = {
+    "type": "rich",
+    "description": "\u200b\n\u200b\nA Super Baby Ant has been summoned!",
+    "color": SUPER_GREEN,
+    "thumbnail": {"url": "https://cdn.discordapp.com/attachments/1349166028126556160/1529913369501368461/petal-ant_baby-super.png?ex=6ac5e21b&is=6ac4909b&hm=7014100e18702d3c262c333786a38cda44d78dccc5698bd998d912b63679038f&"},
+    "footer": {"text": "Sierra (ASIA)"},
+}
+
+
+def test_parse_summon_spawn_flagged_and_natural_spawn_not():
+    """A summoned mob has the same lifecycle as a natural spawn (it is later
+    edited into a defeat broadcast) but BYPASSES the 30-min respawn cooldown,
+    so it must be flagged -- otherwise it silently pollutes the cooldown
+    model that the predictor and the analyses rely on."""
+    e = parse_embed(SUMMON_EMBED, **_msg_args(message_id=900))
+    assert isinstance(e, SpawnEvent)
+    assert e.mob == "Baby Ant" and e.rarity == "super"
+    assert e.region == "Sierra (ASIA)"
+    assert e.summoned is True
+    # natural spawns stay unmarked
+    assert parse_embed(WASP_SPAWN_EMBED, **_msg_args()).summoned is False
+
+
 def test_parse_starfish_kill():
     e = parse_embed(STARFISH_KILL_EMBED, **_msg_args(message_id=2))
     assert isinstance(e, KillEvent)

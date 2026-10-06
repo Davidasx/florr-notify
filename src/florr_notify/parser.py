@@ -62,6 +62,9 @@ _SPAWN_RE = re.compile(
 _KILL_RE = re.compile(
     r"^(?:A|An) (Super|Unique|Eternal) (.+?) has been defeated by (.+)!$"
 )
+_SUMMON_RE = re.compile(
+    r"^(?:A|An) (Super|Unique|Eternal) (.+?) has been summoned!$"
+)
 # Craft broadcasts: "has been crafted/forged by <player>". Verbs observed in
 # the wild: crafted, forged. IMPORTANT: petal broadcasts share names AND
 # thumbnail filenames with mobs (the petal Cactus vs the mob Cactus), so a
@@ -110,6 +113,7 @@ class SpawnEvent:
     color: int
     observed_at: str
     raw_description: str
+    summoned: bool = False         # "has been summoned!" -> bypasses the 30-min cooldown
 
 
 @dataclass(frozen=True)
@@ -182,6 +186,16 @@ def parse_embed(
             mob=mob, rarity=rarity, killers=killers, **shared,
         )
 
+    # 2b. Summoned spawn ("A Super Baby Ant has been summoned!"): same
+    #     lifecycle as a natural spawn (edited into a defeat broadcast
+    #     later) but it BYPASSES the 30-min respawn cooldown, so flag it --
+    #     the store keeps the distinction and analyses can exclude it.
+    if m := _SUMMON_RE.match(desc):
+        rarity = m.group(1).lower()
+        desc_mob = m.group(2)
+        mob = mob_from_fname if mob_from_fname else desc_mob
+        return SpawnEvent(mob=mob, rarity=rarity, summoned=True, **shared)
+
     # 3. Crafted / forged petal -> ignore (e.g. "The Unique Cactus has been
     #    forged by Chzhou66!" -- the petal Cactus shares the mob's name and
     #    image naming). See _CRAFTISH_RE for why this must be a wide net.
@@ -194,7 +208,8 @@ def parse_embed(
     #    always flavor text "You sense ominous vibrations...").
     if mob_from_fname and _rarity_from_fname:
         return SpawnEvent(
-            mob=mob_from_fname, rarity=_rarity_from_fname, **shared,
+            mob=mob_from_fname, rarity=_rarity_from_fname,
+            summoned="has been summoned" in desc.lower(), **shared,
         )
 
     return None

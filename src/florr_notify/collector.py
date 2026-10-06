@@ -233,7 +233,8 @@ class Collector(discord.Client):
                     await self._notify_spawn(e)
                 else:
                     log.info(
-                        "SPAWN  msg=%s  rarity=%-7s mob=%-18s region=%s (backfill)",
+                        "%s  msg=%s  rarity=%-7s mob=%-18s region=%s (backfill)",
+                        "SUMMON" if e.summoned else "SPAWN",
                         e.message_id, e.rarity, repr(e.mob), e.region,
                     )
             elif isinstance(e, KillEvent):
@@ -267,7 +268,8 @@ class Collector(discord.Client):
         prediction = self._predict_line(e)
         suffix = "  [filtered by spawn whitelist]" if throttled else ""
         log.info(
-            "SPAWN  msg=%s  rarity=%-7s mob=%-18s region=%s%s%s",
+            "%s  msg=%s  rarity=%-7s mob=%-18s region=%s%s%s",
+            "SUMMON" if e.summoned else "SPAWN",
             e.message_id, e.rarity, repr(e.mob), e.region,
             f"\n       {prediction}" if prediction else "",
             suffix,

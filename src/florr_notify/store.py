@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS incidents (
     first_seen_at     TEXT NOT NULL,
     last_seen_at      TEXT NOT NULL,
     edit_count        INTEGER NOT NULL DEFAULT 0,
-    raw_description   TEXT
+    raw_description   TEXT,
+    summoned          INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_mob       ON incidents(mob);
 CREATE INDEX IF NOT EXISTS idx_killed    ON incidents(killed_at);
@@ -163,6 +164,14 @@ class Store:
         except sqlite3.OperationalError:
             pass  # already dropped, or a fresh DB that never had it
 
+
+        # 7. v4 -> v5: "has been summoned!" marker. Summons bypass the 30-min
+        #    respawn cooldown, so they must stay distinguishable from natural
+        #    spawns even after the row is overwritten by its kill edit.
+        if "summoned" not in cols:
+            self.conn.execute(
+                "ALTER TABLE incidents ADD COLUMN summoned INTEGER NOT NULL DEFAULT 0"
+            )
     # --- data retention ---
     def _cleanup_stale_alive(self) -> None:
         """Delete incidents that spawned more than BACKFILL_HOURS ago and
@@ -220,11 +229,12 @@ class Store:
                 """INSERT INTO incidents
                    (message_id, channel_id, guild_id, mob, rarity, region,
                     color, spawn_at, first_seen_at,
-                    last_seen_at, edit_count, raw_description)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,0,?)""",
+                    last_seen_at, edit_count, raw_description, summoned)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,0,?,?)""",
                 (e.message_id, e.channel_id, e.guild_id, e.mob, e.rarity,
                  e.region, e.color, e.observed_at,
-                 e.observed_at, e.observed_at, e.raw_description),
+                 e.observed_at, e.observed_at, e.raw_description,
+                 int(e.summoned)),
             )
             return True
         # Row exists: fill in spawn-only fields where currently NULL. We do
@@ -238,10 +248,12 @@ class Store:
                  region          = COALESCE(region, ?),
                  color           = COALESCE(color, ?),
                  raw_description = COALESCE(raw_description, ?),
+                 summoned        = MAX(summoned, ?),
                  last_seen_at    = ?
                WHERE message_id = ?""",
             (e.observed_at, e.mob, e.rarity, e.region,
-             e.color, e.raw_description, e.observed_at, e.message_id),
+             e.color, e.raw_description, int(e.summoned),
+             e.observed_at, e.message_id),
         )
         return False
 

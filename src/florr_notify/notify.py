@@ -152,7 +152,8 @@ class Notifier:
             body += f"  ·  {prediction}"
         await self._fire(
             e.mob, e.rarity, "spawn",
-            title=f"{e.rarity.capitalize()} {e.mob} spawned",
+            title=f"{e.rarity.capitalize()} {e.mob} "
+                  f"{'summoned' if e.summoned else 'spawned'}",
             body=body, icon=icon,
         )
 

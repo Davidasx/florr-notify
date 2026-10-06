@@ -23,13 +23,15 @@ def _killers_to_raw(mob: str, killers: tuple[str, ...]) -> str:
 
 
 def _spawn(mid=MID, mob="Wasp", rarity="super", fname="petal-wasp-super.png",
-           ts="2026-08-09T10:00:00", region="Romeo (EU)"):
+           ts="2026-08-09T10:00:00", region="Romeo (EU)", summoned=False):
     return SpawnEvent(
         message_id=mid, channel_id=CID, guild_id=GID,
         mob=mob, rarity=rarity, region=region,
         image_filename=fname, image_url="https://example/" + fname,
         color=0x2BFFA4, observed_at=ts,
-        raw_description=f"A Super {mob} has spawned!",
+        raw_description=(f"A Super {mob} has been summoned!" if summoned
+                         else f"A Super {mob} has spawned!"),
+        summoned=summoned,
     )
 
 
@@ -59,6 +61,22 @@ def test_spawn_then_kill(store: Store):
     assert r["edit_count"] == 1
     assert json.loads(r["killers_json"]) == ["X", "Y"]
 
+
+
+def test_summoned_flag_survives_the_kill_overwrite(store: Store):
+    """raw_description is overwritten by the kill edit, so the summoned
+    marker needs its own column -- otherwise the trace is lost the moment
+    the mob dies (which is exactly the analysis case that needs it)."""
+    assert store.upsert_spawn(_spawn(mid=MID + 7, summoned=True)) is True
+    assert store.recent(1)[0]["summoned"] == 1
+    assert store.upsert_kill(_kill(mid=MID + 7)) is True
+    r = store.recent(1)[0]
+    assert r["summoned"] == 1          # still marked after the kill
+    assert "summoned" not in (r["raw_description"] or "")
+    # a natural spawn stays 0 (recent() sorts by kill/spawn time, so look at
+    # both rows rather than assuming order)
+    assert store.upsert_spawn(_spawn(mid=MID + 8)) is True
+    assert sorted(x["summoned"] for x in store.recent(2)) == [0, 1]
 
 def test_unique_tier_persisted(store: Store):
     assert store.upsert_spawn(_spawn(mid=MID+1, mob="Ghost", rarity="unique",

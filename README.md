@@ -125,6 +125,11 @@ journalctl --user -u florr-notify -f
   variant (`petal-wasp_mecha-super-x.png` → Mecha Wasp). The spawn image
   always shows the base mob, so a spawned mob's variant is genuinely unknown
   until it dies.
+- Summoned mobs ("A Super X has been summoned!") have the same lifecycle as
+  a natural spawn but BYPASS the 30-min respawn cooldown. They are flagged in
+  the database (`incidents.summoned`), logged as `SUMMON`, and announced with
+  "summoned" instead of "spawned" -- otherwise they would silently corrupt
+  the cooldown model the predictor relies on.
 - Notification filtering: `[whitelist]` in `config.toml` (separate spawn/kill
   lists; spawns match by base mob — variant entries are ignored — and kills
   match exactly) and `[notify] silent` (suppress all desktop notifications).
