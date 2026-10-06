@@ -116,6 +116,11 @@ journalctl --user -u florr-notify -f
   - marks mobs spawned within 24h with no kill broadcast as **alive**
     (list them with `florr-notify alive`);
   - is idempotent: processing the same message twice never duplicates rows.
+  - expires the rest: after the alive-check (so a kill that happened while
+    down is still recovered from the message first), rows older than 24h that
+    never got a kill broadcast are deleted. Each one is tallied per mob in
+    `expired_alive` -- see `florr-notify status` and
+    `research/analysis/insights.py` ('mobs that outlived the window').
 - **No desktop notifications during backfill** (avoids a startup flood);
   data is stored silently.
 - Duplicate kills (the same message edited repeatedly with identical text)

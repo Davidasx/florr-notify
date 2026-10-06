@@ -4,7 +4,7 @@ One row per Discord message (i.e. one Super/Eternal/Unique mob lifecycle),
 identified by message_id. A row may be created by a spawn observation, a
 kill observation, or both.
 
-Schema (v4):
+Schema (v5):
   mob             : full display name including variant (e.g. "Mecha Wasp",
                     "Hel Spider", "Soldier Termite"). The kill embed names
                     the precise mob; for spawn-only rows this is the base
@@ -24,7 +24,8 @@ Schema (v4):
   edit_count      : number of edits observed (diagnostics)
 
 Data retention: rows that spawned more than BACKFILL_HOURS ago and never
-received a kill broadcast are deleted at startup (see _cleanup_stale_alive).
+received a kill broadcast are deleted after the alive-check
+(see expire_stale_alive).
 """
 from __future__ import annotations
 import json
@@ -71,6 +72,18 @@ CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT
 );
+-- Permanent tallies for rows the 24h retention sweep removes (spawned >24h
+-- ago, never killed as far as we saw). The incident rows are intentionally
+-- deleted; these counters survive so "which mobs outlive the window" stays
+-- answerable.
+CREATE TABLE IF NOT EXISTS expired_alive (
+    mob              TEXT NOT NULL,
+    rarity           TEXT,
+    region           TEXT,
+    count            INTEGER NOT NULL DEFAULT 0,
+    last_expired_at  TEXT,
+    PRIMARY KEY (mob, rarity, region)
+);
 """
 
 
@@ -81,7 +94,10 @@ class Store:
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(_SCHEMA)
         self._migrate()
-        self._cleanup_stale_alive()
+        # NOTE: the 24h retention sweep is NOT run here. It is invoked by the
+        # collector AFTER the alive-check, so a mob that outlived the window
+        # is fetched one last time (recovering a kill that happened while we
+        # were down) before its row is deleted.
 
     def close(self) -> None:
         self.conn.close()
@@ -173,24 +189,69 @@ class Store:
                 "ALTER TABLE incidents ADD COLUMN summoned INTEGER NOT NULL DEFAULT 0"
             )
     # --- data retention ---
-    def _cleanup_stale_alive(self) -> None:
+    def expire_stale_alive(self) -> None:
         """Delete incidents that spawned more than BACKFILL_HOURS ago and
         never received a kill broadcast.
 
-        A Super mob does not survive a day, so its kill broadcast was
-        missed (the process was down). Such a row carries no variant
-        information (the variant is only revealed at kill time); deleting
-        it -- instead of fabricating a death time -- keeps the predictor's
-        variant counts unbiased, and guarantees every remaining row is
-        within the BACKFILL_HOURS window.
+        Called by the collector AFTER the alive-check: by then every row that
+        outlived the window has been fetched one last time, so a kill that
+        happened while we were down is already recorded and only truly
+        (or unknowably) alive rows are removed. Each removal is tallied per
+        mob in `expired_alive` first, so the ranking stays answerable.
+        Such a row carries no variant information (the variant is only
+        revealed at kill time), so deleting it -- instead of fabricating a
+        death time -- keeps the predictor's variant counts unbiased and
+        guarantees every remaining row is within the BACKFILL_HOURS window.
         """
         cutoff = (
             datetime.now(timezone.utc) - timedelta(hours=BACKFILL_HOURS)
         ).isoformat()
+        # Accumulate permanent statistics BEFORE deleting: everything removed
+        # here spawned >24h ago without a kill broadcast, i.e. either it truly
+        # outlived the window (slow mobs like Moth/Hornet) or we were down
+        # when it died. Both are worth counting by mob -- the rows themselves
+        # are expired by design, the tallies are not.
+        stale = self.conn.execute(
+            "SELECT mob, rarity, region, COUNT(*) AS n FROM incidents "
+            "WHERE killed_at IS NULL AND spawn_at < ? "
+            "GROUP BY mob, rarity, region",
+            (cutoff,),
+        ).fetchall()
+        for row in stale:
+            self.conn.execute(
+                """INSERT INTO expired_alive (mob, rarity, region, count, last_expired_at)
+                   VALUES (?,?,?,?,?)
+                   ON CONFLICT(mob, rarity, region) DO UPDATE SET
+                       count           = count + excluded.count,
+                       last_expired_at = excluded.last_expired_at""",
+                (row["mob"], row["rarity"], row["region"], row["n"],
+                 datetime.now(timezone.utc).isoformat()),
+            )
+        if stale:
+            log.info(
+                "retention: expired %d alive row(s) older than %dh: %s",
+                sum(r["n"] for r in stale), BACKFILL_HOURS,
+                ", ".join(f"{r['mob']}x{r['n']}" for r in stale[:6]),
+            )
         self.conn.execute(
             "DELETE FROM incidents WHERE killed_at IS NULL AND spawn_at < ?",
             (cutoff,),
         )
+
+    # --- retention statistics ---
+    def expired_alive_counts(self, limit: int = 10) -> list[tuple[str, int]]:
+        """Mobs most often expired by the retention sweep: spawned more than
+        BACKFILL_HOURS ago with no kill broadcast ever observed. Highest
+        count first. The sweep runs after the collector's alive-check, so a
+        kill that happened while we were down was already recovered; an entry
+        here means the row really did outlive the window (or its message was
+        unreachable)."""
+        rows = self.conn.execute(
+            "SELECT mob, SUM(count) AS n FROM expired_alive "
+            "GROUP BY mob ORDER BY n DESC, mob LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [(row["mob"], row["n"]) for row in rows]
 
     # --- meta (cursor state) ---
     def get_meta(self, key: str) -> str | None:

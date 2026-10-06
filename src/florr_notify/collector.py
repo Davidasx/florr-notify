@@ -15,7 +15,7 @@ Restart safety (two cheap startup passes, no full-window re-read):
      catches edits that a creation-based cursor would miss.
 
 Data retention: mobs spawned more than BACKFILL_HOURS ago with no kill
-broadcast are deleted at startup (see store._cleanup_stale_alive).
+broadcast are deleted after the alive-check (store.expire_stale_alive).
 
 Whitelists ([whitelist] spawn/kill in config) filter NOTIFICATIONS only --
 everything is always stored and logged. Silent mode ([notify] silent)
@@ -157,7 +157,14 @@ class Collector(discord.Client):
                 continue
             await self._handle(msg, notify=False)  # re-parse current state
 
+        # 3. Retention sweep LAST: every mob that outlived the 24h window has
+        #    just been fetched above, so a kill that happened while we were
+        #    down is already recorded; only genuinely (or unknowably) alive
+        #    rows are deleted now -- each one tallied per mob first.
+        self.store.expire_stale_alive()
+
         log.info("Backfill complete (no notifications).")
+
     # ---- gateway events ----
     async def on_message(self, message: Message) -> None:
         if message.channel.id != self.cfg.discord.game_channel_id:

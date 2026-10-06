@@ -41,6 +41,12 @@ def cmd_status(cfg) -> None:
     try:
         total = store.count()
         print(f"incidents total: {total}")
+        expired = store.expired_alive_counts(10)
+        if expired:
+            print("mobs that outlived the 24h retention window (no kill seen; "
+                  "accumulated at each cleanup):")
+            for mob, n in expired:
+                print(f"  {mob:<22} {n}")
         print("recent (latest first, up to 10):")
         for row in store.recent(10):
             print(

@@ -110,6 +110,40 @@ def test_kill_dedupe(store: Store):
     assert store.recent(1)[0]["edit_count"] == 1
 
 
+def test_expired_alive_tally_and_sweep_ordering(tmp_path: Path):
+    """Retention: rows older than 24h with no kill broadcast are deleted, but
+    (a) Store() must NOT prune on open -- the collector prunes only AFTER its
+    alive-check, so a kill that happened while we were down is still
+    recoverable from the message; and (b) each pruned row is tallied per mob
+    so "which mobs outlive the window" stays answerable. A killed mob is
+    never tallied."""
+    db = tmp_path / "t.db"
+    old = "2026-01-01T00:00:00"          # far outside the 24h window
+    s = Store(db)
+    for mid, mob in ((MID + 20, "Moth"), (MID + 21, "Moth"), (MID + 22, "Hornet"),
+                     (MID + 23, "Moth")):
+        assert s.upsert_spawn(
+            _spawn(mid=mid, mob=mob, ts=old, fname=f"petal-{mob.lower()}-super.png")
+        ) is True
+    assert s.upsert_kill(_kill(mid=MID + 23, mob="Moth",
+                               fname="petal-moth-super-x.png")) is True
+    s.close()
+
+    s = Store(db)                        # reopening must NOT prune
+    assert s.count() == 4, "Store() must not run the retention sweep"
+
+    s.expire_stale_alive()
+    assert s.expired_alive_counts() == [("Moth", 2), ("Hornet", 1)]
+    assert s.count() == 1                # only the killed Moth survived
+
+    # tallies accumulate across sweeps
+    assert s.upsert_spawn(
+        _spawn(mid=MID + 24, mob="Moth", ts=old, fname="petal-moth-super.png")
+    ) is True
+    s.expire_stale_alive()
+    assert s.expired_alive_counts() == [("Moth", 3), ("Hornet", 1)]
+    s.close()
+
 def test_count(store: Store):
     assert store.count() == 0
     store.upsert_spawn(_spawn())
